@@ -81,6 +81,20 @@ public class QRScannerView: UIView {
         setupImageViews()
     }
 
+    public override var bounds: CGRect {
+        didSet {
+            if oldValue.size.width != frame.size.width || oldValue.size.height != frame.size.height {
+                // called in layoutSubviews makes animation broken
+                updateFocusImageView()
+            }
+        }
+    }
+
+    public override func layoutSubviews() {
+        super.layoutSubviews()
+        updateCameraView()
+    }
+
     public func startRunning() {
         guard isAuthorized() else { return }
         guard !session.isRunning else { return }
@@ -246,10 +260,8 @@ public class QRScannerView: UIView {
     }
 
     private func setupImageViews() {
-        let width = self.bounds.width * 0.618
-        let x = self.bounds.width * 0.191
-        let y = self.bounds.height * 0.191
-        focusImageView = UIImageView(frame: CGRect(x: x, y: y, width: width, height: width))
+        focusImageView = UIImageView()
+        updateFocusImageView()
         focusImageView.image = focusImage ?? UIImage(named: "scan_qr_focus", in: .module, compatibleWith: nil)
         addSubview(focusImageView)
 
@@ -292,7 +304,7 @@ public class QRScannerView: UIView {
         }
         let degrees = atan(aSide / bSide)
 
-        var maxSide: CGFloat =  hypot(corners[3].x - corners[0].x, corners[3].y - corners[0].y)
+        var maxSide: CGFloat = hypot(corners[3].x - corners[0].x, corners[3].y - corners[0].y)
         for (i, _) in corners.enumerated() {
             if i == 3 { break }
             let side = hypot(corners[i].x - corners[i+1].x, corners[i].y - corners[i+1].y)
@@ -316,7 +328,10 @@ public class QRScannerView: UIView {
                 if strongSelf.isBlurEffectEnabled {
                     strongSelf.blurEffectView.isHidden = false
                 }
-                strongSelf.success(qrCode)
+                strongSelf.focusImageView.isHidden = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    strongSelf.success(qrCode)
+                }
         })
     }
 
@@ -357,7 +372,6 @@ extension QRScannerView: AVCaptureMetadataOutputObjectsDelegate {
 
 extension QRScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
     public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        connection.videoOrientation = .portrait
         guard videoDataOutputEnable else { return }
         guard let qrCodeImage = getImageFromSampleBuffer(sampleBuffer: sampleBuffer) else { return }
 
@@ -398,6 +412,44 @@ extension QRScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
         path.addLine(to: feature.bottomLeft.applying(transform))
         path.close()
         return image.crop(path)
+    }
+}
+
+extension QRScannerView {
+
+    private func updateFocusImageView() {
+        let width = min(self.bounds.width, self.bounds.height) * 0.618
+        let x = (self.bounds.width > self.bounds.height) ? (self.bounds.width - width) / 2 : self.bounds.width * 0.191
+        let y = self.bounds.height * 0.191
+        focusImageView.frame = CGRect(x: x, y: y, width: width, height: width)
+    }
+
+    private func updateCameraView() {
+        previewLayer?.connection?.videoOrientation = getOrientation()
+        previewLayer?.frame = bounds
+    }
+
+    private func getOrientation() -> AVCaptureVideoOrientation {
+        let interfaceOrientation: UIInterfaceOrientation
+        if #available(iOS 13.0, *) {
+            interfaceOrientation = window?.windowScene?.interfaceOrientation ?? .portrait
+        } else {
+            interfaceOrientation = UIApplication.shared.statusBarOrientation
+        }
+        switch interfaceOrientation {
+        case .unknown:
+            return .portrait
+        case .portrait:
+            return .portrait
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        case .landscapeLeft:
+            return .landscapeLeft
+        case .landscapeRight:
+            return .landscapeRight
+        @unknown default:
+            return .portrait
+        }
     }
 }
 
