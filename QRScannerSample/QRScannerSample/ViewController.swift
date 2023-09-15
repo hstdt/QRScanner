@@ -39,7 +39,8 @@ final class ViewController: UIViewController {
     }
 
     private func setupQRScannerView() {
-        qrScannerView.configure(delegate: self, input: .init(isBlurEffectEnabled: true))
+        qrScannerView.delegate = self
+        qrScannerView.configure(input: .init(isBlurEffectEnabled: true))
         qrScannerView.startRunning()
     }
 

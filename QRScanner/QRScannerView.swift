@@ -59,9 +59,9 @@ public class QRScannerView: UIView {
     public var isBlurEffectEnabled: Bool = false
 
     // MARK: - Public
+    public var delegate: QRScannerViewDelegate?
 
-    public func configure(delegate: QRScannerViewDelegate, input: Input = .default) {
-        self.delegate = delegate
+    public func configure(input: Input = .default) {
         if let focusImage = input.focusImage {
             self.focusImage = focusImage
         }
@@ -90,9 +90,18 @@ public class QRScannerView: UIView {
         }
     }
 
+    public override func didMoveToWindow() {
+        super.didMoveToWindow()
+        updateFocusImageView() // For SwiftUI, updateFocusImageView() in bounds didSet is not called when wrapped in UIViewRepresentable
+    }
+
     public override func layoutSubviews() {
         super.layoutSubviews()
         updateCameraView()
+    }
+
+    public var isRunning: Bool {
+        session.isRunning == true
     }
 
     public func startRunning() {
@@ -116,9 +125,7 @@ public class QRScannerView: UIView {
 
     public func rescan() {
         guard isAuthorized() else { return }
-        if isBlurEffectEnabled {
-            blurEffectView.isHidden = true
-        }
+        blurEffectView.isHidden = isBlurEffectEnabled
         focusImageView.removeFromSuperview()
         qrCodeImageView.removeFromSuperview()
         setupImageViews()
@@ -151,8 +158,6 @@ public class QRScannerView: UIView {
     }
 
     // MARK: - Private
-
-    private weak var delegate: QRScannerViewDelegate?
     private let metadataQueue = DispatchQueue(label: "metadata.session.qrreader.queue")
     private let videoDataQueue = DispatchQueue(label: "videoData.session.qrreader.queue")
     private let session = AVCaptureSession()
@@ -322,16 +327,16 @@ public class QRScannerView: UIView {
 
             strongSelf.qrCodeImageView.frame = path.bounds
             strongSelf.qrCodeImageView.center = center
-            }, completion: { [weak self] _ in
-                guard let strongSelf = self else { return }
-                strongSelf.qrCodeImageView.image = strongSelf.qrCodeImage
-                if strongSelf.isBlurEffectEnabled {
-                    strongSelf.blurEffectView.isHidden = false
-                }
-                strongSelf.focusImageView.isHidden = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    strongSelf.success(qrCode)
-                }
+        }, completion: { [weak self] _ in
+            guard let strongSelf = self else { return }
+            strongSelf.qrCodeImageView.image = strongSelf.qrCodeImage
+            if strongSelf.isBlurEffectEnabled {
+                strongSelf.blurEffectView.isHidden = false
+            }
+            strongSelf.focusImageView.isHidden = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                strongSelf.success(qrCode)
+            }
         })
     }
 
@@ -374,7 +379,6 @@ extension QRScannerView: AVCaptureVideoDataOutputSampleBufferDelegate {
     public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard videoDataOutputEnable else { return }
         guard let qrCodeImage = getImageFromSampleBuffer(sampleBuffer: sampleBuffer) else { return }
-
         self.qrCodeImage = qrCodeImage
         videoDataOutputEnable = false
     }
