@@ -136,7 +136,7 @@ public class QRScannerView: UIView {
 
     public func setTorchActive(isOn: Bool) {
         assert(Thread.isMainThread)
-        
+
         guard let videoDevice = AVCaptureDevice.default(for: .video),
             videoDevice.hasTorch, videoDevice.isTorchAvailable,
             (metadataOutputEnable || videoDataOutputEnable) else {
@@ -290,7 +290,7 @@ public class QRScannerView: UIView {
 
     private func moveImageViews(qrCode: String, corners: [CGPoint]) {
         assert(Thread.isMainThread)
-        
+
         let path = UIBezierPath()
         path.move(to: corners[0])
         corners[1..<corners.count].forEach() {
@@ -364,7 +364,8 @@ extension QRScannerView: AVCaptureMetadataOutputObjectsDelegate {
             metadataOutputEnable = false
             videoDataOutputEnable = true
 
-            DispatchQueue.main.async { [weak self] in
+            // 魔法值0.15是为了等待下一次AVCaptureVideoDataOutputSampleBufferDelegate有输出，确保有二维码出现。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
                 guard let strongSelf = self else { return }
                 strongSelf.setTorchActive(isOn: false)
                 strongSelf.moveImageViews(qrCode: stringValue, corners: readableObject.corners)
