@@ -270,9 +270,11 @@ public class QRScannerView: UIView {
         focusImageView.image = focusImage ?? UIImage(named: "scan_qr_focus", in: .module, compatibleWith: nil)
         addSubview(focusImageView)
 
-        qrCodeImageView = UIImageView()
-        qrCodeImageView.contentMode = .scaleAspectFill
-        addSubview(qrCodeImageView)
+        if isBlurEffectEnabled {
+            qrCodeImageView = UIImageView()
+            qrCodeImageView.contentMode = .scaleAspectFill
+            addSubview(qrCodeImageView)
+        }
     }
 
     private func addPreviewLayer() {
@@ -325,16 +327,19 @@ public class QRScannerView: UIView {
             strongSelf.focusImageView.center = center
             strongSelf.focusImageView.transform = CGAffineTransform.identity.rotated(by: degrees)
 
-            strongSelf.qrCodeImageView.frame = path.bounds
-            strongSelf.qrCodeImageView.center = center
+            if strongSelf.isBlurEffectEnabled {
+                strongSelf.qrCodeImageView.frame = path.bounds
+                strongSelf.qrCodeImageView.center = center
+            }
+
         }, completion: { [weak self] _ in
             guard let strongSelf = self else { return }
-            strongSelf.qrCodeImageView.image = strongSelf.qrCodeImage
             if strongSelf.isBlurEffectEnabled {
+                strongSelf.qrCodeImageView.image = strongSelf.qrCodeImage
                 strongSelf.blurEffectView.isHidden = false
             }
             strongSelf.focusImageView.isHidden = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (strongSelf.isBlurEffectEnabled ? 0.3 : 0)) {
                 strongSelf.success(qrCode)
             }
         })
@@ -365,7 +370,7 @@ extension QRScannerView: AVCaptureMetadataOutputObjectsDelegate {
             videoDataOutputEnable = true
 
             // 魔法值0.15是为了等待下一次AVCaptureVideoDataOutputSampleBufferDelegate有输出，确保有二维码出现。
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + (isBlurEffectEnabled ? 0.15 : 0)) { [weak self] in
                 guard let strongSelf = self else { return }
                 strongSelf.setTorchActive(isOn: false)
                 strongSelf.moveImageViews(qrCode: stringValue, corners: readableObject.corners)
